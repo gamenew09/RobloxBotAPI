@@ -106,7 +106,8 @@ namespace RobloxBotAPI
                 { 
                     _LastCSRFToken = ""; 
                     return SignoutResult.InternalServerError; 
-                }    
+                }
+    
             }
             catch
             {
@@ -134,7 +135,7 @@ namespace RobloxBotAPI
                 maxRequestFriendshipIter = 0;
                 return new GenericResult_t(GenericResultEnum.InvalidXSRFToken);
             }
-            HttpWebRequest request = _WebClient.GetWebRequest(new Uri(String.Format(ROBLOX_API_URL, "user/unfriend")));
+            HttpWebRequest request = GetWebRequest(new Uri(String.Format(ROBLOX_API_URL, "user/unfriend")));
             NameValueCollection outgoingQueryString = HttpUtility.ParseQueryString(String.Empty);
             outgoingQueryString.Add("friendUserId", userId.ToString());
             string postdata = outgoingQueryString.ToString();
@@ -144,6 +145,7 @@ namespace RobloxBotAPI
             request.ContentType = "application/x-www-form-urlencoded";
             request.ContentLength = data.Length;
             request.Expect = "application/json";
+            Console.WriteLine("Data: {0}", postdata);
 
             // add post data to request
             Stream postStream = request.GetRequestStream();
@@ -174,22 +176,24 @@ namespace RobloxBotAPI
                     catch { }
                 }
                 else
+                {
                     return new GenericResult_t(GenericResultEnum.InternalServerError);
+                }
             }
             catch
             {
                 return new GenericResult_t(GenericResultEnum.Unknown);
             }
 
-            return await RequestFriendship(userId);
+            return await Unfriend(userId);
         }
 
         HttpWebRequest GetWebRequest(Uri url)
         {
             if (String.IsNullOrWhiteSpace(_LastCSRFToken))
-                return _WebClient.GetWebRequest(new Uri("http://www.roblox.com/messages/send"));
+                return _WebClient.GetWebRequest(url);
             else
-                return _WebClient.GetWebRequest(new Uri("http://www.roblox.com/messages/send"), _LastCSRFToken);
+                return _WebClient.GetWebRequest(url, _LastCSRFToken);
         }
 
         /// <summary>

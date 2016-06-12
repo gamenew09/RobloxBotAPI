@@ -156,5 +156,24 @@ namespace RobloxBotAPI.Example
                     MessageBox.Show("Text must be a integer.");
             }
         }
+
+        private void button3_Click(object sender, EventArgs e)
+        {
+            if (bot != null)
+            {
+                int outint = 0;
+                if (int.TryParse(textBox3.Text, out outint))
+                {
+                    Thread t = new Thread(() =>
+                    {
+                        GenericResult_t res = SynchronousAWait(bot.Unfriend(outint));
+                        MessageBox.Show(String.Format("Unfriend Result: Message: {0} Result: {1} Success: {2}", res.Message, res.ResultEnum, res.Success));
+                    });
+                    t.Start();
+                }
+                else
+                    MessageBox.Show("Text must be a integer.");
+            }
+        }
     }
 }
