@@ -1,6 +1,5 @@
 ﻿using HtmlAgilityPack;
 using Newtonsoft.Json;
-using RobloxBotAPI.Event;
 using RobloxBotAPI.JsonResult;
 using System;
 using System.Collections;
@@ -14,9 +13,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
-using WebBrowserReadyState = System.Windows.Forms.WebBrowserReadyState;
 using System.Reflection;
-using Awesomium.Windows.Forms;
 using Awesomium.Core;
 
 namespace RobloxBotAPI
@@ -126,13 +123,39 @@ namespace RobloxBotAPI
             catch { }
         */
 
-        int maxRequestFriendshipIter = 0;
+        public async Task<PrivateMessage[]> GetMessages(int messageTab = 0, int pageNumber=0, int pageSize=20)
+        {
+            List<PrivateMessage> pms = new List<PrivateMessage>();
+            HttpWebRequest request = _WebClient.GetWebRequest(new Uri(String.Format("https://www.roblox.com/messages/api/get-messages?messageTab=0&pageNumber=0&pageSize=20", messageTab, pageNumber, pageSize)));
+            request.Method = "GET";
+            request.ContentLength = 0;
+            request.Expect = "application/json";
 
+            using (HttpWebResponse resp = (HttpWebResponse)await request.GetResponseAsync())
+            {
+                Stream dataStream = resp.GetResponseStream();
+                StreamReader reader = new StreamReader(dataStream);
+                string result = await reader.ReadToEndAsync();
+                PrivateMessages_t msgs = JsonConvert.DeserializeObject<PrivateMessages_t>(result);
+                foreach(Message_t msg in msgs.Collection)
+                    pms.Add(new PrivateMessage(msg));
+                return pms.ToArray();
+            }
+        }
+
+        int maxRequestFriendshipIter = 0;
+        int maxRequestUnfriend = 0;
+
+        /// <summary>
+        /// Unfriends a user.
+        /// </summary>
+        /// <param name="userId">The user to unfriend.</param>
+        /// <returns>The result of the request.</returns>
         public async Task<GenericResult_t> Unfriend(int userId)
         {
-            if (maxRequestFriendshipIter > MAX_TRIES_WITH_CSRF_TOKEN)
+            if (maxRequestUnfriend > MAX_TRIES_WITH_CSRF_TOKEN)
             {
-                maxRequestFriendshipIter = 0;
+                maxRequestUnfriend = 0;
                 return new GenericResult_t(GenericResultEnum.InvalidXSRFToken);
             }
             HttpWebRequest request = GetWebRequest(new Uri(String.Format(ROBLOX_API_URL, "user/unfriend")));
@@ -145,7 +168,6 @@ namespace RobloxBotAPI
             request.ContentType = "application/x-www-form-urlencoded";
             request.ContentLength = data.Length;
             request.Expect = "application/json";
-            Console.WriteLine("Data: {0}", postdata);
 
             // add post data to request
             Stream postStream = request.GetRequestStream();
@@ -160,7 +182,7 @@ namespace RobloxBotAPI
                     Stream dataStream = resp.GetResponseStream();
                     StreamReader reader = new StreamReader(dataStream);
                     string result = await reader.ReadToEndAsync();
-                    maxSignoutIters = 0;
+                    maxRequestUnfriend = 0;
                     return JsonConvert.DeserializeObject<GenericResult_t>(result);
                 }
             }
@@ -168,7 +190,7 @@ namespace RobloxBotAPI
             {
                 if (((HttpWebResponse)ex.Response).StatusCode == (HttpStatusCode)403)
                 {
-                    maxSignoutIters++;
+                    maxRequestUnfriend++;
                     try
                     {
                         _LastCSRFToken = ex.Response.Headers.Get("X-Csrf-Token");
@@ -209,7 +231,6 @@ namespace RobloxBotAPI
                 maxRequestFriendshipIter = 0;
                 return new GenericResult_t(GenericResultEnum.InvalidXSRFToken);
             }
-            Console.WriteLine("RequestFriendship {0}", String.Format(ROBLOX_API_URL, "user/request-friendship"));
             HttpWebRequest request = GetWebRequest(new Uri(String.Format(ROBLOX_API_URL, "user/request-friendship")));
             NameValueCollection outgoingQueryString = HttpUtility.ParseQueryString(String.Empty);
             outgoingQueryString.Add("recipientUserId", String.Format("{0}", userId));
@@ -221,8 +242,6 @@ namespace RobloxBotAPI
             request.ContentLength = data.Length;
             request.Expect = "application/json";
             request.UserAgent = "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36";
-            Console.WriteLine(request.UserAgent);
-            Console.WriteLine("RequestFriendship made {0}", postdata);
             // add post data to request
             Stream postStream = request.GetRequestStream();
             postStream.Write(data, 0, data.Length);
@@ -231,14 +250,11 @@ namespace RobloxBotAPI
 
             try
             {
-                Console.WriteLine("RequestFriendship sending");
                 using (HttpWebResponse resp = (HttpWebResponse)await request.GetResponseAsync())
                 {
-                    Console.WriteLine("RequestFriendship gotten");
                     Stream dataStream = resp.GetResponseStream();
                     StreamReader reader = new StreamReader(dataStream);
                     string result = await reader.ReadToEndAsync();
-                    Console.WriteLine("RequestFriendship Result: {0}", result);
                     maxRequestFriendshipIter = 0;
                     _LastCSRFToken = "";
                     return JsonConvert.DeserializeObject<GenericResult_t>(result);
@@ -249,14 +265,12 @@ namespace RobloxBotAPI
                 Stream dataStream = ((HttpWebResponse)ex.Response).GetResponseStream();
                 StreamReader reader = new StreamReader(dataStream);
                 string result = reader.ReadToEnd();
-                Console.WriteLine(result);
                 if (((HttpWebResponse)ex.Response).StatusCode == (HttpStatusCode)403)
                 {
                     maxRequestFriendshipIter++;
                     try
                     {
                         _LastCSRFToken = ex.Response.Headers.Get("X-Csrf-Token");
-                        Console.WriteLine(_LastCSRFToken);
                     }
                     catch { }
                 }
@@ -325,33 +339,6 @@ namespace RobloxBotAPI
             }
         }
 
-        public bool EventsEnabled
-        {
-            get;
-            private set;
-        }
-
-        private int _RefreshRate;
-
-        Thread eventThread;
-
-        /// <summary>
-        /// Detects events every [number] seconds. Please do not set this to a low number otherwise ROBLOX will not like it and slow down.
-        /// NOTE: It will not update during a Thread.Sleep, so it'll wait the Thread.Sleep amount then next sleep it'll pull from this value.
-        /// </summary>
-        public int RefreshRate
-        {
-            get { return _RefreshRate; }
-            set { _RefreshRate = value; }
-        }
-
-        public void DisableEvents()
-        {
-            if (!EventsEnabled)
-                return;
-            EventsEnabled = false;
-        }
-
         // Based off of http://stackoverflow.com/questions/6324810/using-webbrowser-in-a-console-application and http://stackoverflow.com/a/516599
         // Right now this isn't useful since the code snippet I used still didn't even work with it. :(
         async Task<string> CreateWebBrowser(string url, CookieContainer container = null, Func<WebView, bool> ShouldReturnFunc = null)
@@ -379,7 +366,6 @@ namespace RobloxBotAPI
                         foreach (Cookie c in container.GetCookies(new Uri(url)))
                             view.WebSession.SetCookie(new Uri(url), String.Format("{0}={1};", c.Name, c.Value), c.HttpOnly, true); // (yn) Crossing Fingers
                     view.Source = new Uri(url);
-                    Console.WriteLine(view.IsJavascriptEnabled);
                     view.LoadingFrameComplete += (sender, ev) =>
                     {
                         if (view == null || !view.IsLive || !ev.IsMainFrame)
@@ -408,29 +394,12 @@ namespace RobloxBotAPI
             return result;
         }
 
-
-        public void EnableEvents()
-        {
-            if (EventsEnabled)
-                return;
-            EventsEnabled = true;
-
-            eventThread = new Thread(() =>
-            {
-                while(EventsEnabled)
-                {
-
-                    Thread.Sleep(RefreshRate * 1000);
-                }
-            });
-            eventThread.Start();
-        }
-
         /// <summary>
         /// Get's a captcha for a user.
+        /// Unknown if it works at the moment, use with caution. Might also throw an exception too.
         /// </summary>
-        /// <param name="username"></param>
-        /// <returns></returns>
+        /// <param name="username">The username that was used to log in, this might not be necessary.</param>
+        /// <returns>The captcha that was found.</returns>
         public static async Task<Captcha> GetCaptchaForUser(string username)
         {
             Captcha captcha = new Captcha();
@@ -467,7 +436,6 @@ namespace RobloxBotAPI
                 Task<SignoutResult> task = Signout();
                 while (!task.IsCompleted)
                     Thread.Sleep(1);
-                Console.WriteLine("Signout tasked completed in Dispose: {0}", task.Result);
             });
             t.Start();
         }
@@ -503,116 +471,7 @@ namespace RobloxBotAPI
 #region Broken Snippets
     /*
      * 
-        public async Task<MessageRecievedEvent[]> GetMessages()
-        {
-            /*
-            HttpWebRequest request;
-            if (String.IsNullOrWhiteSpace(_LastCSRFToken))
-                request = _WebClient.GetWebRequest(new Uri("https://www.roblox.com/my/messages/#!/inbox"));
-            else
-                request = _WebClient.GetWebRequest(new Uri("https://www.roblox.com/my/messages/#!/inbox"), _LastCSRFToken);
-            request.ContentLength = 0;
-            request.Method = "GET";
-            /
-
-            bool saved = false;
-
-            HtmlDocument doc = new HtmlDocument();
-            string result = await CreateWebBrowser("https://www.roblox.com/my/messages/#!/inbox", _WebClient.CookieContainer,
-                new Func<WebView, bool>((view) =>
-                {
-                    if (!saved)
-                    {
-                        saved = true;
-                        using (StreamWriter writer = new StreamWriter("test.html")) // Debug Writing, to see if it actually works.
-                        {
-                            writer.Write(view.HTML);
-                        }
-                    }
-                    doc.LoadHtml(view.HTML);
-                    
-                    foreach (HtmlNode na in doc.DocumentNode.SelectNodes("//div[@ng-switch-default]"))
-                    {
-                        int i = 0;
-                        try
-                        {
-                            Console.WriteLine(i);
-                            Console.WriteLine(na.Descendants("div").Count());
-                            Console.WriteLine("--");
-                            if (na.Descendants("div").Count() > 1)
-                            {
-                                return true;
-                            }
-                            i++;
-                        }
-                        catch(Exception ex)
-                        {
-                            Console.WriteLine(ex);
-                        }
-                    }
-                    return false;
-                }));
-
-            using(StreamWriter writer = new StreamWriter("test.html")) // Debug Writing, to see if it actually works.
-            {
-                writer.Write(result);
-            }
-            
-            doc.LoadHtml(result);
-            HtmlNode n = null;
-            foreach (HtmlNode na in doc.DocumentNode.SelectNodes("//div[@ng-switch-default]"))
-            {
-                int i = 0;
-                try
-                {
-                    if (na.Descendants("div").Count() > 1)
-                    {
-                        n = na;
-                        break;
-                    }
-                    i++;
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine(ex);
-                }
-            }
-            IEnumerable<HtmlNode> findclasses = n.Descendants("div");
-            /*
-             * .Where(d =>
-                d.Attributes.Contains("class") && d.Attributes["class"].Value.Contains("roblox-message-row")
-            )
-             /
-            Console.WriteLine(doc.DocumentNode.SelectNodes("//div[@id='MessagesInbox']").Count);
-            List<MessageRecievedEvent> messages = new List<MessageRecievedEvent>();
-            foreach(HtmlNode node in findclasses)
-            {
-                
-                try
-                {
-                    String subject = node.Descendants("div").Where(d =>
-                        d.Attributes.Contains("class") && d.Attributes["class"].Value.Contains("subject")
-                    ).First().InnerText;
-
-                    String body = node.Descendants("div").Where(d =>
-                        d.Attributes.Contains("ng-bind-html") && d.Attributes["ng-bind-html"].Value.Contains("message.Body | htmlToPlaintext")
-                    ).First().InnerText;
-
-                    int userId = int.Parse(node.Descendants("a").Where(d =>
-                        d.Attributes.Contains("rbx-avatar")
-                    ).First().GetAttributeValue("href", "").Replace("https://www.roblox.com/users/", "").Replace("/profile/", ""));
-
-                    messages.Add(new MessageRecievedEvent(body, subject, userId));
-                }
-                catch(Exception ex)
-                {
-                    Console.WriteLine(ex);
-                }
-            }
-            return messages.ToArray();
-
-            
-        }
+        
      */
 #endregion
 }

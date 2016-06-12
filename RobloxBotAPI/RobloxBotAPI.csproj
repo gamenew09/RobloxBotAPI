@@ -52,10 +52,10 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AsyncHelper.cs" />
-    <Compile Include="Event\MessageRecievedEvent.cs" />
     <Compile Include="JsonResult\Captcha.cs" />
     <Compile Include="JsonResult\GenericResult_t.cs" />
     <Compile Include="JsonResult\LoginResult.cs" />
+    <Compile Include="JsonResult\PrivateMessage.cs" />
     <Compile Include="JsonResult\RobloxGroup.cs" />
     <Compile Include="JsonResult\RobloxUser.cs" />
     <Compile Include="JsonResult\SignoutResult.cs" />
@@ -67,6 +67,9 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Event\" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

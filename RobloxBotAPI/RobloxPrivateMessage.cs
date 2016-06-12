@@ -43,6 +43,7 @@ namespace RobloxBotAPI
 
         private String _LastCSRFToken;
 
+        // Code converted from php to C#: https://github.com/FroastJ/roblox-bots/blob/master/message.php
         public async Task<SendResult_t> Send()
         {
             HttpWebRequest request;

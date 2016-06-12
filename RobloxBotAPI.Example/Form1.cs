@@ -1,5 +1,4 @@
-﻿using RobloxBotAPI.Event;
-using RobloxBotAPI.JsonResult;
+﻿using RobloxBotAPI.JsonResult;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -79,19 +78,19 @@ namespace RobloxBotAPI.Example
                 while (!resa.IsCompleted)
                     Thread.Sleep(1);
                 Console.WriteLine("Reason: {0} Short Message: {1} Success: {2}", resa.Result.Result, resa.Result.shortMessage, resa.Result.success);
-                
-                
-                /*
-                Task<MessageRecievedEvent[]> btask = bot.GetMessages();
+
+
+
+                Task<PrivateMessage[]> btask = bot.GetMessages();
                 while (!btask.IsCompleted)
                     Thread.Sleep(1);
 
-                foreach (MessageRecievedEvent message in btask.Result)
+                foreach (PrivateMessage message in btask.Result)
                 {
-                    Console.WriteLine("Subject: {0} Body: {1} Sent By: {2}", message.Subject, message.Body, message.SenderID);
+                    Console.WriteLine("Subject: {0} Body: {1} Sent By: {2}", message.Subject, message.Body, message.Sender);
                 }
                 Console.WriteLine("Get Messages");
-                */
+                
             });
             t.Start();
         }
@@ -174,6 +173,12 @@ namespace RobloxBotAPI.Example
                 else
                     MessageBox.Show("Text must be a integer.");
             }
+        }
+
+        private void openWebBrowserToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            AwesomiumBrowser browser = new AwesomiumBrowser();
+            browser.Show();
         }
     }
 }
