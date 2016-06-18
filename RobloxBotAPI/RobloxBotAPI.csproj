@@ -53,6 +53,7 @@
   <ItemGroup>
     <Compile Include="AsyncHelper.cs" />
     <Compile Include="JsonResult\Captcha.cs" />
+    <Compile Include="JsonResult\CurrencyBalance_t.cs" />
     <Compile Include="JsonResult\GenericResult_t.cs" />
     <Compile Include="JsonResult\LoginResult.cs" />
     <Compile Include="JsonResult\PrivateMessage.cs" />
@@ -64,6 +65,7 @@
     <Compile Include="RobloxAPIHelper.cs" />
     <Compile Include="RobloxBot.cs" />
     <Compile Include="RobloxPrivateMessage.cs" />
+    <Compile Include="WebCache.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

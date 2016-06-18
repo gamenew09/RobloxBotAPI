@@ -29,6 +29,25 @@ namespace RobloxBotAPI
         public const String ROBLOX_API_URL = "https://api.roblox.com/{0}";
         public const int MAX_TRIES_WITH_CSRF_TOKEN = 10;
 
+        private ObjectCache<CurrencyBalance_t> _CurrencyCache = new ObjectCache<CurrencyBalance_t>(false);
+
+        public int Robux
+        {
+            get 
+            {
+                _CurrencyCache.TryUpdate();
+                return _CurrencyCache.Object.robux;
+            }
+        }
+
+        public async void ForceUpdateRobuxCache()
+        {
+            await Task.Run(() =>
+                {
+                    _CurrencyCache.Update();
+                });
+        }
+
         private CookieAwareWebClient _WebClient;
 
         // This would get passed to all requests as a
@@ -37,6 +56,22 @@ namespace RobloxBotAPI
         internal RobloxBot()
         {
             _WebClient = new CookieAwareWebClient();
+            _CurrencyCache.CacheLength = 60 * 2f;
+            _CurrencyCache.UpdateCache += (sender, ev) =>
+                {
+                    HttpWebRequest request = GetWebRequest(new Uri(String.Format(ROBLOX_API_URL, "currency/balance")));
+                    request.Method = "GET";
+                    request.ContentLength = 0;
+                    request.Expect = "application/json";
+
+                    using (HttpWebResponse resp = (HttpWebResponse)request.GetResponse())
+                    {
+                        Stream dataStream = resp.GetResponseStream();
+                        StreamReader reader = new StreamReader(dataStream);
+                        string result = reader.ReadToEnd();
+                        ev.Object = JsonConvert.DeserializeObject<CurrencyBalance_t>(result);
+                    }
+                };
         }
 
         async Task<HttpWebResponse> GetResponse(string api)
@@ -146,6 +181,41 @@ namespace RobloxBotAPI
         int maxRequestFriendshipIter = 0;
         int maxRequestUnfriend = 0;
 
+        public async Task<bool> AwardBadge(int userId, int badgeId, int placeId)
+        {
+            List<PrivateMessage> pms = new List<PrivateMessage>();
+            HttpWebRequest request = _WebClient.GetWebRequest(new Uri(String.Format(ROBLOX_API_URL, "assets/award-badge")));
+            NameValueCollection outgoingQueryString = HttpUtility.ParseQueryString(String.Empty);
+            outgoingQueryString.Add("userId", userId.ToString());
+            outgoingQueryString.Add("badgeId", badgeId.ToString());
+            outgoingQueryString.Add("placeId", placeId.ToString());
+            string postdata = outgoingQueryString.ToString();
+            ASCIIEncoding ascii = new ASCIIEncoding();
+            byte[] data = ascii.GetBytes(postdata.ToString());
+            request.Method = "POST";
+            request.ContentType = "application/x-www-form-urlencoded";
+            request.ContentLength = data.Length;
+
+            try
+            {
+                using (HttpWebResponse resp = (HttpWebResponse)await request.GetResponseAsync())
+                {
+                    Stream dataStream = resp.GetResponseStream();
+                    StreamReader reader = new StreamReader(dataStream);
+                    string result = await reader.ReadToEndAsync();
+
+                    Console.WriteLine(result);
+
+                    if (result.Contains("award") && result.Contains("won"))
+                    {
+                        return true;
+                    }
+                }
+            }
+            catch (Exception ex) { Console.WriteLine(ex); }
+            return false;
+        }
+
         /// <summary>
         /// Unfriends a user.
         /// </summary>
@@ -233,7 +303,7 @@ namespace RobloxBotAPI
             }
             HttpWebRequest request = GetWebRequest(new Uri(String.Format(ROBLOX_API_URL, "user/request-friendship")));
             NameValueCollection outgoingQueryString = HttpUtility.ParseQueryString(String.Empty);
-            outgoingQueryString.Add("recipientUserId", String.Format("{0}", userId));
+            outgoingQueryString.Add("recipientUserId", userId.ToString());
             string postdata = outgoingQueryString.ToString();
             ASCIIEncoding ascii = new ASCIIEncoding();
             byte[] data = ascii.GetBytes(postdata.ToString());
@@ -241,7 +311,6 @@ namespace RobloxBotAPI
             request.ContentType = "application/x-www-form-urlencoded";
             request.ContentLength = data.Length;
             request.Expect = "application/json";
-            request.UserAgent = "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36";
             // add post data to request
             Stream postStream = request.GetRequestStream();
             postStream.Write(data, 0, data.Length);
@@ -332,6 +401,12 @@ namespace RobloxBotAPI
 
                 LoginResult realResult = new LoginResult(res);
                 realResult.Bot = bot;
+
+                Thread t = new Thread(() =>
+                {
+                    bot.ForceUpdateRobuxCache();
+                });
+                t.Start();
 
                 reader.Close();
                 dataStream.Close();
