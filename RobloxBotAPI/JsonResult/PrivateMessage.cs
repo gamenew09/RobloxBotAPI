@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -79,6 +80,7 @@ namespace RobloxBotAPI.JsonResult
         public bool IsRead { get { return _PM.IsRead; } }
         public bool IsSystemMessage { get { return _PM.IsSystemMessage; } }
         public bool IsReportAbuseDisplayed { get { return _PM.IsReportAbuseDisplayed; } }
+
     }
 
 }

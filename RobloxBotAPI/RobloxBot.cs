@@ -180,6 +180,120 @@ namespace RobloxBotAPI
 
         int maxRequestFriendshipIter = 0;
         int maxRequestUnfriend = 0;
+        int maxRequestMarkRead = 0;
+
+
+        public enum MarkAsReadResult
+        {
+            Success,
+            StatusCodeFailure,
+            MaxTriesReached,
+            Unknown
+        }
+
+        public async Task<MarkAsReadResult> MarkAsRead(int messageId)
+        {
+            // https://www.roblox.com/messages/api/mark-messages-read
+            // {"messageIds":[0000]}
+            String json = "{\"messageIds\":[" + messageId + "]}";
+            Console.WriteLine(json);
+            HttpWebRequest request;
+            if (String.IsNullOrWhiteSpace(_LastCSRFToken))
+                request = _WebClient.GetWebRequest(new Uri("http://www.roblox.com/messages/send"));
+            else
+                request = _WebClient.GetWebRequest(new Uri("http://www.roblox.com/messages/send"), _LastCSRFToken);
+
+            if (maxRequestMarkRead >= RobloxBot.MAX_TRIES_WITH_CSRF_TOKEN)
+            {
+                maxRequestMarkRead = 0;
+                return MarkAsReadResult.MaxTriesReached;
+            }
+
+            ASCIIEncoding ascii = new ASCIIEncoding();
+            byte[] data = ascii.GetBytes(json);
+
+            request.Method = "POST";
+            request.ContentType = "application/json";
+            request.ContentLength = data.Length;
+
+            request.Expect = "application/json";
+
+            Stream postStream = request.GetRequestStream();
+            postStream.Write(data, 0, data.Length);
+            postStream.Flush();
+            postStream.Close();
+
+            WebHeaderCollection headers = request.Headers;
+
+            for (int i = 0; i < headers.Count; ++i)
+            {
+                string header = headers.GetKey(i);
+                foreach (string value in headers.GetValues(i))
+                {
+                    Console.WriteLine("{0}: {1}", header, value);
+                }
+            }
+
+            try
+            {
+                using (HttpWebResponse resp = (HttpWebResponse)await request.GetResponseAsync())
+                {
+                    Stream dataStream = resp.GetResponseStream();
+                    StreamReader reader = new StreamReader(dataStream);
+                    string result = await reader.ReadToEndAsync();
+                    
+                    maxRequestMarkRead = 0;
+                    _LastCSRFToken = "";
+                    return MarkAsReadResult.Success;
+                }
+            }
+            catch (WebException ex)
+            {
+                Console.WriteLine(((HttpWebResponse)ex.Response).StatusCode);
+                if (((HttpWebResponse)ex.Response).StatusCode == (HttpStatusCode)403)
+                {
+                    maxRequestMarkRead++;
+                    try
+                    {
+                        _LastCSRFToken = ex.Response.Headers.Get("X-Csrf-Token");
+                        Console.WriteLine(_LastCSRFToken);
+                    }
+                    catch { }
+                }
+                else
+                {
+                    headers = ex.Response.Headers;
+
+                    for (int i = 0; i < headers.Count; ++i)
+                    {
+                        string header = headers.GetKey(i);
+                        foreach (string value in headers.GetValues(i))
+                        {
+                            Console.WriteLine("{0}: {1}", header, value);
+                        }
+                    }
+                    maxRequestMarkRead = 0;
+                    using (StreamReader reader = new StreamReader(ex.Response.GetResponseStream()))
+                        Console.WriteLine("Raw Response: {0}", reader.ReadToEnd());
+                    _LastCSRFToken = "";
+                    return MarkAsReadResult.StatusCodeFailure;
+                }
+            }
+            catch
+            {
+                maxRequestMarkRead = 0;
+                _LastCSRFToken = "";
+                return MarkAsReadResult.Unknown;
+            }
+
+            return await MarkAsRead(messageId);
+            
+        }
+
+        public async Task<MarkAsReadResult> MarkAsRead(PrivateMessage message)
+        {
+            return await MarkAsRead(message.Id);
+        }
 
         public async Task<bool> AwardBadge(int userId, int badgeId, int placeId)
         {
