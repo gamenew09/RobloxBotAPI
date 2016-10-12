@@ -1,7 +1,7 @@
 Roblox Bot Documentation
 ========================
 
-Contents:
+Roblox Bot is an API that allows you to act under a Roblox user.
 
 .. toctree::
    :maxdepth: 2
